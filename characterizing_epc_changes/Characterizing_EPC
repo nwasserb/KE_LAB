@@ -1,0 +1,77 @@
+import pyvisa as visa
+import time
+import math
+import numpy as np
+import matplotlib.pyplot as plt
+from time import sleep
+
+
+resourceManager = visa.ResourceManager() 
+dev = 'TCPIP0::10.0.0.2::5000::SOCKET'
+session = resourceManager.open_resource(dev)
+print('\n Open Successful!')
+session.read_termination = '\n'
+session.write_termination = '\n'
+
+
+dev_EPC = 'ASRL3::INSTR'
+session_EPC = resourceManager.open_resource(dev_EPC)
+print('\n Open Successful!')
+session_EPC.read_termination = None
+session_EPC.write_termination = '\r\n'
+session_EPC.query_termination = '\r\n'
+relPort1mW = []
+relPort2mW = []
+relPort3mW = []
+relPort4mW = []
+#Has to have the read because of buffer
+#print(session.query('V?'))
+#  1 read for V?
+
+sweep_range = range(-5000, 5001, 1)
+for i in sweep_range:
+    sleep(.0155)
+    variable = 'V1,' + str(i)
+    session_EPC.query(variable)
+#    print(session_EPC.read())
+    result = session.query('READ? 0')
+    # Split the string based on the comma (',') separator
+    ports = result.split(',')
+
+    # Convert the strings to float numbers
+    port1 = float(ports[0].split(':')[-1])
+    port2 = float(ports[1])
+    port3 = float(ports[2])
+    port4 = float(ports[3])
+
+    port1mW = float(pow(10, port1/10))
+    port2mW = float(pow(10, port2/10))
+    port3mW = float(pow(10, port3/10))
+    port4mW = float(pow(10, port4/10))
+
+    totalmW = port1mW + port2mW + port3mW + port4mW
+
+    relPort1mW.append(port1mW / totalmW) 
+    relPort2mW.append(port2mW / totalmW)
+    relPort3mW.append(port3mW / totalmW)
+    relPort4mW.append(port4mW / totalmW)
+    # print(i)
+
+# Plotting the data
+plt.figure(figsize=(10, 6))
+plt.plot(sweep_range, relPort1mW, label='Relative Port 1 Power (mW)')
+plt.plot(sweep_range, relPort2mW, label='Relative Port 2 Power (mW)')
+plt.plot(sweep_range, relPort3mW, label='Relative Port 3 Power (mW)')
+plt.plot(sweep_range, relPort4mW, label='Relative Port 4 Power (mW)')
+plt.xlabel('Input Voltage (mV)')
+plt.ylabel('Relative Power (mW)')
+plt.title('Relative Power vs. Input Voltage Channel 1')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+#Go back to 0mV slowly
+for i in range(5000, -1, -1):
+    sleep(.1)
+    variable = 'V1,' + str(i)
+    session_EPC.query(variable)
